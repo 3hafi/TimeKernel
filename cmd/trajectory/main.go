@@ -62,7 +62,7 @@ func run(args []string) error {
 		}
 		h, _ := ingest.HashFile(args[2])
 		_ = st.MarkImport(args[2], h)
-		fmt.Printf("Imported %d ICS items (events + tasks)\n", len(events))
+		fmt.Printf("Imported %d ICS events\n", len(events))
 		return nil
 	case "import-logs":
 		if len(args) < 3 {
@@ -117,8 +117,6 @@ func run(args []string) error {
 		return whatifCmd(dbPath, cfgPath, args[2:])
 	case "doctor":
 		return doctorCmd(dbPath, cfgPath)
-	case "export-ai":
-		return exportAICmd(dbPath, cfgPath, args[2:])
 	default:
 		usage()
 		return nil
@@ -217,57 +215,6 @@ func whatifCmd(dbPath, cfgPath string, args []string) error {
 	return report.Write(*out, report.BuildWhatIfMarkdown(*date, variants), "md")
 }
 
-func exportAICmd(dbPath, cfgPath string, args []string) error {
-	fs := flag.NewFlagSet("export-ai", flag.ContinueOnError)
-	fromS := fs.String("from", "", "optional YYYY-MM-DD")
-	toS := fs.String("to", "", "optional YYYY-MM-DD")
-	format := fs.String("format", "json", "json|md")
-	out := fs.String("out", "ai_export.json", "output path")
-	if err := fs.Parse(args); err != nil {
-		return err
-	}
-	from := time.Date(1970, 1, 1, 0, 0, 0, 0, time.Local)
-	to := time.Now().AddDate(20, 0, 0)
-	var err error
-	if strings.TrimSpace(*fromS) != "" {
-		from, err = time.Parse("2006-01-02", *fromS)
-		if err != nil {
-			return err
-		}
-	}
-	if strings.TrimSpace(*toS) != "" {
-		to, err = time.Parse("2006-01-02", *toS)
-		if err != nil {
-			return err
-		}
-		to = to.Add(23*time.Hour + 59*time.Minute)
-	}
-	st, err := store.Open(dbPath)
-	if err != nil {
-		return err
-	}
-	cfg := loadCfg(cfgPath)
-	e, err := st.EventsBetween(from, to)
-	if err != nil {
-		return err
-	}
-	l, err := st.LogsBetween(from, to)
-	if err != nil {
-		return err
-	}
-	d := features.BuildDaily(from, to, e, l, cfg)
-	ins := insights.Generate(d)
-	payload, err := report.BuildAIExport(from, to, e, l, d, ins, *format)
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(*out, []byte(payload), 0o644); err != nil {
-		return err
-	}
-	fmt.Printf("wrote %s (%d events/tasks, %d logs)\n", *out, len(e), len(l))
-	return nil
-}
-
 func doctorCmd(dbPath, cfgPath string) error {
 	st, err := store.Open(dbPath)
 	if err != nil {
@@ -297,7 +244,7 @@ func doctorCmd(dbPath, cfgPath string) error {
 }
 
 func usage() {
-	fmt.Println("trajectory commands: config init | import-ics <file> | import-logs <file> | log [-t 'YYYY-MM-DD HH:MM'] '<tokens>' | report --from --to [--format md|html] | trajectory --days 14 | whatif --date --alloc | doctor | export-ai [--from --to --format json|md --out ai_export.json]")
+	fmt.Println("trajectory commands: config init | import-ics <file> | import-logs <file> | log [-t 'YYYY-MM-DD HH:MM'] '<tokens>' | report --from --to [--format md|html] | trajectory --days 14 | whatif --date --alloc | doctor")
 }
 
 func loadCfg(path string) config.Config {

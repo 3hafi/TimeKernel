@@ -27,33 +27,25 @@ func ParseICS(path string, cfg config.Config) ([]store.Event, error) {
 	}
 	lines = unfold(lines)
 
-	var items []store.Event
+	var events []store.Event
 	cur := map[string]string{}
-	block := ""
+	in := false
 	for _, raw := range lines {
 		line := strings.TrimSpace(raw)
-		switch line {
-		case "BEGIN:VEVENT", "BEGIN:VTODO":
-			block = strings.TrimPrefix(line, "BEGIN:")
+		if line == "BEGIN:VEVENT" {
+			in = true
 			cur = map[string]string{}
 			continue
-		case "END:VEVENT", "END:VTODO":
-			if block == "VEVENT" {
-				e := eventFromMap(cur, path, cfg)
-				if !e.Start.IsZero() && !e.End.IsZero() {
-					items = append(items, e)
-				}
+		}
+		if line == "END:VEVENT" {
+			in = false
+			e := eventFromMap(cur, path, cfg)
+			if !e.Start.IsZero() && !e.End.IsZero() {
+				events = append(events, e)
 			}
-			if block == "VTODO" {
-				t := taskFromMap(cur, path, cfg)
-				if !t.Start.IsZero() && !t.End.IsZero() {
-					items = append(items, t)
-				}
-			}
-			block = ""
 			continue
 		}
-		if block == "" {
+		if !in {
 			continue
 		}
 		if i := strings.Index(line, ":"); i > 0 {
@@ -62,7 +54,7 @@ func ParseICS(path string, cfg config.Config) ([]store.Event, error) {
 			cur[k] = v
 		}
 	}
-	return items, nil
+	return events, nil
 }
 
 func unfold(lines []string) []string {
@@ -115,47 +107,16 @@ func eventFromMap(m map[string]string, src string, cfg config.Config) store.Even
 	st, ad := parseICSDateWithTZ(dsKey, ds)
 	en, _ := parseICSDateWithTZ(deKey, de)
 	title := m["SUMMARY"]
-	category := categoryFor(title+" "+m["DESCRIPTION"], cfg)
+	category := ""
+	lower := strings.ToLower(title + " " + m["DESCRIPTION"])
+	for k, c := range cfg.CalendarMap {
+		if strings.Contains(lower, k) {
+			category = c
+			break
+		}
+	}
 	if cfg.PrivacyRedact {
 		title = "[redacted]"
 	}
 	return store.Event{ExternalID: m["UID"], Start: st, End: en, Title: title, Description: m["DESCRIPTION"], Location: m["LOCATION"], AllDay: ad, Timezone: "local", Category: category, Source: src}
-}
-
-func taskFromMap(m map[string]string, src string, cfg config.Config) store.Event {
-	var dsKey, deKey, ds, de string
-	for k, v := range m {
-		if strings.HasPrefix(k, "DTSTART") {
-			dsKey, ds = k, v
-		}
-		if strings.HasPrefix(k, "DUE") {
-			deKey, de = k, v
-		}
-	}
-	start, ad := parseICSDateWithTZ(dsKey, ds)
-	end, _ := parseICSDateWithTZ(deKey, de)
-	if start.IsZero() && !end.IsZero() {
-		start = end.Add(-30 * time.Minute)
-	}
-	if end.IsZero() && !start.IsZero() {
-		end = start.Add(30 * time.Minute)
-	}
-	title := m["SUMMARY"]
-	if title == "" {
-		title = "Untitled task"
-	}
-	if cfg.PrivacyRedact {
-		title = "[redacted]"
-	}
-	return store.Event{ExternalID: "todo-" + m["UID"], Start: start, End: end, Title: title, Description: m["DESCRIPTION"], Location: m["LOCATION"], AllDay: ad, Timezone: "local", Category: "task", Source: src}
-}
-
-func categoryFor(text string, cfg config.Config) string {
-	lower := strings.ToLower(text)
-	for k, c := range cfg.CalendarMap {
-		if strings.Contains(lower, k) {
-			return c
-		}
-	}
-	return ""
 }

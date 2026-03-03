@@ -112,23 +112,6 @@ Data quality helper:
 - `trajectory trajectory --days 7|14 --out trajectory.md`
 - `trajectory whatif --date YYYY-MM-DD --alloc "study=2h,gaming=1h,doomscroll=30m,exercise=45m" --out whatif.md`
 - `trajectory doctor`
-- `trajectory export-ai [--from YYYY-MM-DD --to YYYY-MM-DD] --format json|md --out ai_export.json`
-
-
-## AI-friendly full export (for ChatGPT/Claude/etc.)
-If you want raw, portable data for external AI analysis, export everything you've imported:
-
-```bash
-./trajectory export-ai --format json --out ai_export.json
-```
-
-Or export a date range and markdown:
-
-```bash
-./trajectory export-ai --from 2026-01-01 --to 2026-03-31 --format md --out ai_export.md
-```
-
-This includes events, tasks (when present in ICS as `VTODO`), logs, daily features, and generated insights in a model-friendly format.
 
 ## SQLite schema
 - `events`: ICS events with idempotent `external_id` unique key.

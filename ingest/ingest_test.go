@@ -8,20 +8,17 @@ import (
 )
 
 func TestParseICS(t *testing.T) {
-	data := "BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:1\nDTSTART;TZID=America/New_York:20260101T090000\nDTEND;TZID=America/New_York:20260101T100000\nSUMMARY:Standup meeting\nDESCRIPTION:team\n sync\nEND:VEVENT\nBEGIN:VTODO\nUID:t1\nDUE:20260101T140000\nSUMMARY:Finish draft\nEND:VTODO\nEND:VCALENDAR\n"
+	data := "BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:1\nDTSTART;TZID=America/New_York:20260101T090000\nDTEND;TZID=America/New_York:20260101T100000\nSUMMARY:Standup meeting\nDESCRIPTION:team\n sync\nEND:VEVENT\nEND:VCALENDAR\n"
 	f, _ := os.CreateTemp("", "t*.ics")
 	defer os.Remove(f.Name())
 	_, _ = f.WriteString(data)
 	_ = f.Close()
 	e, err := ParseICS(f.Name(), config.Default())
-	if err != nil || len(e) != 2 {
+	if err != nil || len(e) != 1 {
 		t.Fatalf("parse err %v len %d", err, len(e))
 	}
 	if e[0].Category != "meeting" {
 		t.Fatalf("want meeting got %s", e[0].Category)
-	}
-	if e[1].Category != "task" {
-		t.Fatalf("want task got %s", e[1].Category)
 	}
 }
 
